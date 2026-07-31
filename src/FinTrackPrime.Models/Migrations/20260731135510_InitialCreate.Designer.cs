@@ -12,7 +12,7 @@ using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 namespace FinTrackPrime.Models.Migrations
 {
     [DbContext(typeof(FinTrackDbContext))]
-    [Migration("20260731094005_InitialCreate")]
+    [Migration("20260731135510_InitialCreate")]
     partial class InitialCreate
     {
         /// <inheritdoc />
