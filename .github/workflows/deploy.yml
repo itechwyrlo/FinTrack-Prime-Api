@@ -1,0 +1,59 @@
+name: Deploy to MonsterASP.NET
+
+on:
+  push:
+    branches:
+      - main
+
+jobs:
+  build-and-deploy:
+    runs-on: windows-latest
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup .NET 10
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: '10.0.x'
+
+      - name: Restore
+        run: dotnet restore FinTrackPrime.sln
+
+      # Validation gate: fails the workflow (and blocks deploy) if the
+      # solution doesn't compile clean. There are no automated tests in
+      # this repo yet, so this build is currently the whole gate.
+      - name: Build (validate)
+        run: dotnet build FinTrackPrime.sln -c Release --no-restore
+
+      - name: Publish
+        run: dotnet publish src/FinTrackPrime.WebApi/FinTrackPrime.WebApi.csproj -c Release --no-build -o ./publish
+
+      # Refuses to ship the placeholder appsettings.json as-is: those
+      # keys are intentionally blank in the repo (see Program.cs's
+      # startup guard), so this only catches the case where someone
+      # accidentally re-added real values before pushing.
+      - name: Guard against committed secrets
+        shell: pwsh
+        run: |
+          $json = Get-Content ./publish/appsettings.json -Raw | ConvertFrom-Json
+          if ($json.ConnectionStrings.Default -or $json.Jwt.Key -or $json.PayPal.ClientSecret) {
+            Write-Error "appsettings.json in the publish output has non-empty secrets. Remove them before pushing -- production secrets belong in monsterasp.net environment variables, not the repo."
+            exit 1
+          }
+
+      - name: Deploy via Web Deploy
+        shell: pwsh
+        run: |
+          $msdeploy = 'C:\Program Files\IIS\Microsoft Web Deploy V3\msdeploy.exe'
+          $publishPath = Join-Path $env:GITHUB_WORKSPACE 'publish'
+          $password = '${{ secrets.WEBDEPLOY_PASSWORD }}'
+          $siteName = '${{ secrets.SITE_NAME }}'
+          $computerName = "https://${{ secrets.SITE_HOST }}:8172/msdeploy.axd?site=$siteName"
+
+          $sourceArg = "-source:contentPath=$publishPath"
+          $username = '${{ secrets.WEBDEPLOY_USERNAME }}'
+          $destArg = "-dest:contentPath=$siteName,computerName=$computerName,userName=$username,password=$password,authType=Basic"
+
+          & $msdeploy -verb:sync $sourceArg $destArg -allowUntrusted -enableRule:AppOffline

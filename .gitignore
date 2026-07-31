@@ -1,0 +1,25 @@
+## .NET
+bin/
+obj/
+*.user
+*.suo
+
+## Local-only secrets — never push real credentials
+**/appsettings.Development.json
+**/appsettings.Local.json
+**/appsettings.*.local.json
+*.pfx
+*.publishsettings
+
+## IDE
+.vs/
+.vscode/
+*.swp
+
+## OS
+.DS_Store
+Thumbs.db
+
+## Build output
+publish/
+*.log
