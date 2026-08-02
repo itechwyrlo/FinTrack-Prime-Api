@@ -272,9 +272,6 @@ namespace FinTrackPrime.Models.Migrations
                     b.Property<int>("Direction")
                         .HasColumnType("int");
 
-                    b.Property<bool>("IsFlaggedUnusual")
-                        .HasColumnType("bit");
-
                     b.Property<DateTime>("OccurredAtUtc")
                         .HasColumnType("datetime2");
 

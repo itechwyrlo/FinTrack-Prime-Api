@@ -193,8 +193,7 @@ namespace FinTrackPrime.Models.Migrations
                     Category = table.Column<string>(type: "nvarchar(80)", maxLength: 80, nullable: false),
                     Amount = table.Column<decimal>(type: "decimal(18,2)", nullable: false),
                     Direction = table.Column<int>(type: "int", nullable: false),
-                    OccurredAtUtc = table.Column<DateTime>(type: "datetime2", nullable: false),
-                    IsFlaggedUnusual = table.Column<bool>(type: "bit", nullable: false)
+                    OccurredAtUtc = table.Column<DateTime>(type: "datetime2", nullable: false)
                 },
                 constraints: table =>
                 {

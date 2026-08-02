@@ -13,7 +13,6 @@ namespace FinTrackPrime.Models.ViewModels
         public decimal Amount { get; set; }
         public TransactionDirection Direction { get; set; }
         public DateTime OccurredAtUtc { get; set; }
-        public bool IsFlaggedUnusual { get; set; }
     }
 
     public class AccountViewModel

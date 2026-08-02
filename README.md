@@ -50,9 +50,7 @@ before trusting it.
   (Checking, Savings) with starter transactions, returns a JWT.
 - `POST /api/auth/login` — returns a JWT for an existing user.
 - `GET /api/dashboard` — authenticated. Returns every account the caller
-  owns, each with its recent transactions, and recalculates the
-  unusual-activity flag on each transaction (a simple standard-deviation
-  rule against the account's own expense history, not machine learning).
+  owns, each with its recent transactions.
 
 ## Phase 2 additions
 
@@ -155,9 +153,3 @@ behind it. Still outside this backend's scope: the React frontend
 itself, and anything Prof's guide ends up asking for once you're through
 it.
 
-## A note on the unusual-activity flag
-
-`HasPremiumAccess` and `IsFlaggedUnusual` are both plain booleans right
-now, set by straightforward rules in the Business layer. That's enough to
-demonstrate the "IT concept" in the presentation (decision support,
-information security) without needing a real fraud model.

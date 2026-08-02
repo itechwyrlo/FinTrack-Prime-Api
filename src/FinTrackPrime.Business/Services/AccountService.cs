@@ -12,16 +12,6 @@ namespace FinTrackPrime.Business.Services
 {
     public class AccountService : IAccountService
     {
-        // A transaction needs to sit at least this many standard
-        // deviations above the account's average expense to be flagged.
-        // Two accounts of the same small size shouldn't flag every normal
-        // purchase, so this is intentionally conservative.
-        private const double UnusualStdDevThreshold = 2.0;
-
-        // Below this many expense transactions, there isn't enough
-        // history to call anything "unusual" yet.
-        private const int MinTransactionsForFlagging = 4;
-
         private readonly FinTrackDbContext _db;
 
         public AccountService(FinTrackDbContext db)
@@ -40,8 +30,6 @@ namespace FinTrackPrime.Business.Services
 
             foreach (var account in accounts)
             {
-                RecomputeUnusualFlags(account.Transactions);
-
                 dashboard.Accounts.Add(new AccountViewModel
                 {
                     Id = account.Id,
@@ -59,15 +47,10 @@ namespace FinTrackPrime.Business.Services
                             Amount = t.Amount,
                             Direction = t.Direction,
                             OccurredAtUtc = t.OccurredAtUtc,
-                            IsFlaggedUnusual = t.IsFlaggedUnusual,
                         })
                         .ToList(),
                 });
             }
-
-            // Flags were recalculated in memory above; persist them so the
-            // next read (and any future reporting) sees the same result.
-            await _db.SaveChangesAsync();
 
             return dashboard;
         }
@@ -117,13 +100,8 @@ namespace FinTrackPrime.Business.Services
                 Amount = request.Amount,
                 Direction = request.Direction,
                 OccurredAtUtc = DateTime.UtcNow,
-                IsFlaggedUnusual = false,
             };
 
-            // The balance reflects the transaction immediately; the
-            // unusual-activity flag is recalculated separately, the next
-            // time the dashboard is loaded, since it depends on the
-            // account's whole history, not just this one entry.
             account.Balance += request.Direction == TransactionDirection.Income
                 ? request.Amount
                 : -request.Amount;
@@ -139,48 +117,7 @@ namespace FinTrackPrime.Business.Services
                 Amount = transaction.Amount,
                 Direction = transaction.Direction,
                 OccurredAtUtc = transaction.OccurredAtUtc,
-                IsFlaggedUnusual = transaction.IsFlaggedUnusual,
             };
-        }
-
-        // Rule-based outlier check, not machine learning: flags an expense
-        // transaction when its amount sits more than UnusualStdDevThreshold
-        // standard deviations above the account's own expense average.
-        private static void RecomputeUnusualFlags(ICollection<Transaction> transactions)
-        {
-            var expenseAmounts = transactions
-                .Where(t => t.Direction == TransactionDirection.Expense)
-                .Select(t => (double)t.Amount)
-                .ToList();
-
-            foreach (var transaction in transactions)
-            {
-                transaction.IsFlaggedUnusual = false;
-            }
-
-            if (expenseAmounts.Count < MinTransactionsForFlagging)
-            {
-                return;
-            }
-
-            var mean = expenseAmounts.Average();
-            var variance = expenseAmounts.Sum(a => Math.Pow(a - mean, 2)) / expenseAmounts.Count;
-            var stdDev = Math.Sqrt(variance);
-
-            if (stdDev == 0)
-            {
-                return;
-            }
-
-            var threshold = mean + (UnusualStdDevThreshold * stdDev);
-
-            foreach (var transaction in transactions)
-            {
-                if (transaction.Direction == TransactionDirection.Expense && (double)transaction.Amount > threshold)
-                {
-                    transaction.IsFlaggedUnusual = true;
-                }
-            }
         }
     }
 }
