@@ -1,5 +1,4 @@
 using System;
-using System.Linq;
 using System.Threading.Tasks;
 using FinTrackPrime.Business.Interfaces;
 using FinTrackPrime.Models.Entities;
@@ -31,21 +30,20 @@ namespace FinTrackPrime.Business.Services
             _config = config;
         }
 
-        public async Task<AuthResponse> VerifyAndGrantAsync(Guid userId, string paypalOrderId, PremiumTool tool)
+        public async Task<AuthResponse> VerifyAndGrantAsync(Guid userId, string paypalOrderId)
         {
             var user = await _db.Users.FirstOrDefaultAsync(u => u.Id == userId)
                        ?? throw new InvalidOperationException("User not found.");
 
-            var alreadyOwnsThisTool = await _db.PremiumPurchases
-                .AnyAsync(p => p.UserId == userId && p.Tool == tool);
-            if (alreadyOwnsThisTool)
+            var alreadyUnlocked = await _db.PremiumPurchases.AnyAsync(p => p.UserId == userId);
+            if (alreadyUnlocked)
             {
-                throw new InvalidOperationException("You already have access to this tool.");
+                throw new InvalidOperationException("You already have premium access.");
             }
 
             // Block replay before calling PayPal at all: a used order id
             // is rejected the same way whether it belongs to this user or
-            // another one, and regardless of which tool it claims to be for.
+            // another one.
             var orderAlreadyUsed = await _db.PremiumPurchases.AnyAsync(p => p.PayPalOrderId == paypalOrderId);
             if (orderAlreadyUsed)
             {
@@ -59,9 +57,6 @@ namespace FinTrackPrime.Business.Services
                 throw new InvalidOperationException($"Order is not completed (status: {order.Status}).");
             }
 
-            // Same flat price for every tool right now. If tools ever
-            // need different prices, this becomes a per-tool lookup
-            // instead of one config value.
             var expectedPrice = decimal.Parse(_config["Premium:PriceUsd"] ?? "15.00");
             var expectedCurrency = _config["Premium:Currency"] ?? "USD";
 
@@ -79,7 +74,6 @@ namespace FinTrackPrime.Business.Services
             {
                 Id = Guid.NewGuid(),
                 UserId = user.Id,
-                Tool = tool,
                 PayPalOrderId = paypalOrderId,
                 AmountPaid = order.AmountValue,
                 Currency = order.CurrencyCode,
@@ -88,15 +82,9 @@ namespace FinTrackPrime.Business.Services
 
             await _db.SaveChangesAsync();
 
-            // The old token doesn't know about this tool until it
-            // expires, so the frontend needs a fresh one immediately,
-            // reflecting every tool the user owns now, this one included.
-            var unlockedTools = await _db.PremiumPurchases
-                .Where(p => p.UserId == user.Id)
-                .Select(p => p.Tool)
-                .ToListAsync();
-
-            var generatedAccessToken = _jwtTokenGenerator.GenerateToken(user, unlockedTools);
+            // The old token doesn't know premium is unlocked until it
+            // expires, so the frontend needs a fresh one immediately.
+            var generatedAccessToken = _jwtTokenGenerator.GenerateToken(user, premiumUnlocked: true);
 
             return new AuthResponse
             {
@@ -104,22 +92,18 @@ namespace FinTrackPrime.Business.Services
                 AccessTokenExpiresAtUtc = generatedAccessToken.ExpiresAtUtc,
                 FullName = user.FullName,
                 Email = user.Email,
-                UnlockedTools = unlockedTools,
+                PremiumUnlocked = true,
             };
         }
 
         public async Task<PremiumStatusViewModel> GetStatusAsync(Guid userId)
         {
-            var purchases = await _db.PremiumPurchases
-                .Where(p => p.UserId == userId)
-                .OrderBy(p => p.PurchasedAtUtc)
-                .ToListAsync();
+            var purchase = await _db.PremiumPurchases.FirstOrDefaultAsync(p => p.UserId == userId);
 
             return new PremiumStatusViewModel
             {
-                UnlockedTools = purchases
-                    .Select(p => new UnlockedToolViewModel { Tool = p.Tool, PurchasedAtUtc = p.PurchasedAtUtc })
-                    .ToList(),
+                IsUnlocked = purchase is not null,
+                PurchasedAtUtc = purchase?.PurchasedAtUtc,
             };
         }
     }

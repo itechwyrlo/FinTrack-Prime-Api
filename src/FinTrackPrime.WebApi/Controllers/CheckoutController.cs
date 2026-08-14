@@ -31,14 +31,15 @@ namespace FinTrackPrime.WebApi.Controllers
         // Called after the frontend's PayPal button reports approval.
         // Nothing is trusted from that report except the order id; this
         // endpoint re-checks the order with PayPal before granting
-        // anything.
+        // anything. A successful call unlocks every premium tool at
+        // once, since this is the one purchase that covers all of them.
         [HttpPost("verify")]
         public async Task<ActionResult<AuthResponse>> Verify(VerifyPurchaseRequest request)
         {
             try
             {
                 var result = await _premiumAccessService.VerifyAndGrantAsync(
-                    GetUserId(), request.PayPalOrderId, request.Tool);
+                    GetUserId(), request.PayPalOrderId);
                 return Ok(result);
             }
             catch (InvalidOperationException ex)

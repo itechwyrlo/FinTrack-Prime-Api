@@ -1,5 +1,4 @@
 using System;
-using System.Collections.Generic;
 using System.IdentityModel.Tokens.Jwt;
 using System.Security.Claims;
 using System.Text;
@@ -21,7 +20,7 @@ namespace FinTrackPrime.Business.Services
             _config = config;
         }
 
-        public GeneratedAccessToken GenerateToken(User user, IEnumerable<PremiumTool> unlockedTools)
+        public GeneratedAccessToken GenerateToken(User user, bool premiumUnlocked)
         {
             var jwtSection = _config.GetSection("Jwt");
             var keyBytes = Encoding.UTF8.GetBytes(jwtSection["Key"]!);
@@ -33,13 +32,13 @@ namespace FinTrackPrime.Business.Services
                 new("fullName", user.FullName),
             };
 
-            // One claim per unlocked tool, only added when actually
-            // unlocked. RequireLoanCalculator (etc.) policies check for
-            // the presence of these, so a tool the user hasn't bought
-            // simply has no claim, rather than a claim set to "False".
-            foreach (var tool in unlockedTools)
+            // Only added when actually unlocked. The RequirePremium
+            // policy checks for the presence of this claim, so a user
+            // who hasn't bought premium simply has no claim, rather than
+            // a claim set to "False".
+            if (premiumUnlocked)
             {
-                claims.Add(new Claim($"unlock:{tool}", "True"));
+                claims.Add(new Claim("unlock:premium", "True"));
             }
 
             var credentials = new SigningCredentials(

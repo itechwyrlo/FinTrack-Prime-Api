@@ -15,10 +15,14 @@ namespace FinTrackPrime.Models.Persistence
         public DbSet<Transaction> Transactions => Set<Transaction>();
         public DbSet<BudgetCategory> BudgetCategories => Set<BudgetCategory>();
         public DbSet<PremiumPurchase> PremiumPurchases => Set<PremiumPurchase>();
+        public DbSet<Asset> Assets => Set<Asset>();
         public DbSet<InvestmentHolding> InvestmentHoldings => Set<InvestmentHolding>();
         public DbSet<RetirementPlan> RetirementPlans => Set<RetirementPlan>();
         public DbSet<Liability> Liabilities => Set<Liability>();
         public DbSet<RefreshToken> RefreshTokens => Set<RefreshToken>();
+        public DbSet<LinkedInstitution> LinkedInstitutions => Set<LinkedInstitution>();
+        public DbSet<Notification> Notifications => Set<Notification>();
+        public DbSet<LoanRate> LoanRates => Set<LoanRate>();
 
         protected override void OnModelCreating(ModelBuilder modelBuilder)
         {
@@ -54,6 +58,11 @@ namespace FinTrackPrime.Models.Persistence
             modelBuilder.Entity<Account>(entity =>
             {
                 entity.Property(a => a.Balance).HasColumnType("decimal(18,2)");
+                entity.Property(a => a.Currency).HasMaxLength(8);
+                entity.Property(a => a.FiatEquivalentValue).HasColumnType("decimal(18,2)");
+                entity.Property(a => a.FiatEquivalentCurrency).HasMaxLength(8);
+                entity.Property(a => a.ExternalAccountId).HasMaxLength(128);
+                entity.Property(a => a.Institution).HasMaxLength(80);
                 entity.HasOne(a => a.User)
                       .WithMany(u => u.Accounts)
                       .HasForeignKey(a => a.UserId)
@@ -64,6 +73,8 @@ namespace FinTrackPrime.Models.Persistence
             {
                 entity.Property(t => t.Amount).HasColumnType("decimal(18,2)");
                 entity.Property(t => t.Category).HasMaxLength(80);
+                entity.Property(t => t.ExternalTransactionId).HasMaxLength(128);
+                entity.HasIndex(t => new { t.AccountId, t.ExternalTransactionId });
                 entity.HasOne(t => t.Account)
                       .WithMany(a => a.Transactions)
                       .HasForeignKey(t => t.AccountId)
@@ -86,6 +97,11 @@ namespace FinTrackPrime.Models.Persistence
                 // second row for the same PayPal order, even if two
                 // requests race each other.
                 entity.HasIndex(p => p.PayPalOrderId).IsUnique();
+
+                // Also unique: at most one purchase per user now that
+                // premium is a single all-tools unlock rather than one
+                // row per tool.
+                entity.HasIndex(p => p.UserId).IsUnique();
                 entity.Property(p => p.PayPalOrderId).HasMaxLength(64).IsRequired();
                 entity.Property(p => p.AmountPaid).HasColumnType("decimal(18,2)");
                 entity.Property(p => p.Currency).HasMaxLength(8);
@@ -130,6 +146,72 @@ namespace FinTrackPrime.Models.Persistence
                       .WithMany()
                       .HasForeignKey(l => l.UserId)
                       .OnDelete(DeleteBehavior.Cascade);
+            });
+
+            modelBuilder.Entity<Asset>(entity =>
+            {
+                entity.Property(a => a.Name).HasMaxLength(120).IsRequired();
+                entity.Property(a => a.Amount).HasColumnType("decimal(18,2)");
+                entity.HasOne(a => a.User)
+                      .WithMany()
+                      .HasForeignKey(a => a.UserId)
+                      .OnDelete(DeleteBehavior.Cascade);
+            });
+
+            modelBuilder.Entity<LinkedInstitution>(entity =>
+            {
+                entity.Property(l => l.Institution).HasMaxLength(80).IsRequired();
+                entity.Property(l => l.AccessToken).HasMaxLength(2048).IsRequired();
+                entity.HasOne(l => l.User)
+                      .WithMany(u => u.LinkedInstitutions)
+                      .HasForeignKey(l => l.UserId)
+                      .OnDelete(DeleteBehavior.Cascade);
+            });
+
+            modelBuilder.Entity<Notification>(entity =>
+            {
+                entity.Property(n => n.Title).HasMaxLength(200).IsRequired();
+                entity.Property(n => n.Message).HasMaxLength(1000).IsRequired();
+                entity.HasIndex(n => new { n.UserId, n.CreatedAtUtc });
+
+                // Filtered index: most rows have RelatedTransactionId ==
+                // null (any future non-spend notification type), and SQL
+                // Server would otherwise reject a plain unique index once
+                // more than one NULL exists — same pattern as
+                // User.GoogleId above.
+                entity.HasIndex(n => n.RelatedTransactionId)
+                      .IsUnique()
+                      .HasFilter("[RelatedTransactionId] IS NOT NULL");
+
+                entity.HasOne(n => n.User)
+                      .WithMany()
+                      .HasForeignKey(n => n.UserId)
+                      .OnDelete(DeleteBehavior.Cascade);
+            });
+
+            modelBuilder.Entity<LoanRate>(entity =>
+            {
+                entity.Property(r => r.AnnualRatePercent).HasColumnType("decimal(5,2)");
+                entity.HasIndex(r => r.Type).IsUnique();
+
+                // Seeded via HasData, not a hand-written InsertData in some
+                // migration's Up() — HasData ties this data to the model
+                // itself, so `dotnet ef migrations add` regenerates it
+                // automatically every time, even a from-scratch InitialMigration
+                // regenerate. Ids/UpdatedAtUtc are fixed constants (not
+                // Guid.NewGuid()/DateTime.UtcNow) because EF diffs HasData
+                // snapshot-to-snapshot; a value that changes every run would
+                // make EF think the seed data changed on every migration.
+                //
+                // Placeholder rates — replace with the bank's real figures
+                // before this goes anywhere near production.
+                entity.HasData(
+                    new LoanRate { Id = Guid.Parse("8f14e45f-ceea-4b90-8f0a-000000000001"), Type = LiabilityType.Mortgage, AnnualRatePercent = 6.50m, UpdatedAtUtc = new DateTime(2026, 8, 10, 0, 0, 0, DateTimeKind.Utc) },
+                    new LoanRate { Id = Guid.Parse("8f14e45f-ceea-4b90-8f0a-000000000002"), Type = LiabilityType.AutoLoan, AnnualRatePercent = 7.25m, UpdatedAtUtc = new DateTime(2026, 8, 10, 0, 0, 0, DateTimeKind.Utc) },
+                    new LoanRate { Id = Guid.Parse("8f14e45f-ceea-4b90-8f0a-000000000003"), Type = LiabilityType.StudentLoan, AnnualRatePercent = 5.50m, UpdatedAtUtc = new DateTime(2026, 8, 10, 0, 0, 0, DateTimeKind.Utc) },
+                    new LoanRate { Id = Guid.Parse("8f14e45f-ceea-4b90-8f0a-000000000004"), Type = LiabilityType.PersonalLoan, AnnualRatePercent = 11.00m, UpdatedAtUtc = new DateTime(2026, 8, 10, 0, 0, 0, DateTimeKind.Utc) },
+                    new LoanRate { Id = Guid.Parse("8f14e45f-ceea-4b90-8f0a-000000000005"), Type = LiabilityType.Other, AnnualRatePercent = 9.00m, UpdatedAtUtc = new DateTime(2026, 8, 10, 0, 0, 0, DateTimeKind.Utc) }
+                );
             });
 
             base.OnModelCreating(modelBuilder);

@@ -11,7 +11,7 @@ namespace FinTrackPrime.WebApi.Controllers
 {
     [ApiController]
     [Route("api/financial-statement")]
-    [Authorize(Policy = "RequireFinancialStatement")]
+    [Authorize(Policy = "RequirePremium")]
     public class FinancialStatementController : ControllerBase
     {
         private readonly IFinancialStatementService _financialStatementService;
@@ -28,11 +28,46 @@ namespace FinTrackPrime.WebApi.Controllers
             return Ok(statement);
         }
 
+        [HttpPost("assets")]
+        public async Task<ActionResult<AssetLineViewModel>> AddAsset(CreateAssetRequest request)
+        {
+            try
+            {
+                var asset = await _financialStatementService.AddAssetAsync(GetUserId(), request);
+                return Ok(asset);
+            }
+            catch (InvalidOperationException ex)
+            {
+                return BadRequest(new { message = ex.Message });
+            }
+        }
+
+        [HttpDelete("assets/{assetId:guid}")]
+        public async Task<IActionResult> RemoveAsset(Guid assetId)
+        {
+            try
+            {
+                await _financialStatementService.RemoveAssetAsync(GetUserId(), assetId);
+                return NoContent();
+            }
+            catch (InvalidOperationException ex)
+            {
+                return NotFound(new { message = ex.Message });
+            }
+        }
+
         [HttpPost("liabilities")]
         public async Task<ActionResult<LiabilityViewModel>> AddLiability(CreateLiabilityRequest request)
         {
-            var liability = await _financialStatementService.AddLiabilityAsync(GetUserId(), request);
-            return Ok(liability);
+            try
+            {
+                var liability = await _financialStatementService.AddLiabilityAsync(GetUserId(), request);
+                return Ok(liability);
+            }
+            catch (InvalidOperationException ex)
+            {
+                return BadRequest(new { message = ex.Message });
+            }
         }
 
         [HttpDelete("liabilities/{liabilityId:guid}")]

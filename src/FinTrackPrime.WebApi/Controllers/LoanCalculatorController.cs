@@ -1,4 +1,5 @@
 using System;
+using System.Collections.Generic;
 using System.Security.Claims;
 using System.Threading.Tasks;
 using FinTrackPrime.Business.Interfaces;
@@ -11,7 +12,7 @@ namespace FinTrackPrime.WebApi.Controllers
 {
     [ApiController]
     [Route("api/loan-calculator")]
-    [Authorize(Policy = "RequireLoanCalculator")]
+    [Authorize(Policy = "RequirePremium")]
     public class LoanCalculatorController : ControllerBase
     {
         private readonly ILoanCalculatorService _loanCalculatorService;
@@ -21,13 +22,25 @@ namespace FinTrackPrime.WebApi.Controllers
             _loanCalculatorService = loanCalculatorService;
         }
 
-        // Stateless: nothing about a calculation is tied to the user or
-        // saved, so this is a POST-as-compute rather than a resource.
-        [HttpPost("calculate")]
-        public ActionResult<LoanCalculationResultViewModel> Calculate(LoanCalculationRequest request)
+        [HttpGet("rates")]
+        public async Task<ActionResult<List<LoanRateViewModel>>> GetRates()
         {
-            var result = _loanCalculatorService.Calculate(request);
-            return Ok(result);
+            var rates = await _loanCalculatorService.GetRatesAsync();
+            return Ok(rates);
+        }
+
+        [HttpPost("calculate")]
+        public async Task<ActionResult<LoanCalculationResultViewModel>> Calculate(LoanCalculationRequest request)
+        {
+            try
+            {
+                var result = await _loanCalculatorService.CalculateAsync(request);
+                return Ok(result);
+            }
+            catch (InvalidOperationException ex)
+            {
+                return BadRequest(new { message = ex.Message });
+            }
         }
 
         // Also a POST-as-compute: the result depends on the caller's
@@ -36,8 +49,15 @@ namespace FinTrackPrime.WebApi.Controllers
         [HttpPost("affordability")]
         public async Task<ActionResult<LoanAffordabilityResultViewModel>> CheckAffordability(LoanAffordabilityRequest request)
         {
-            var result = await _loanCalculatorService.CheckAffordabilityAsync(GetUserId(), request);
-            return Ok(result);
+            try
+            {
+                var result = await _loanCalculatorService.CheckAffordabilityAsync(GetUserId(), request);
+                return Ok(result);
+            }
+            catch (InvalidOperationException ex)
+            {
+                return BadRequest(new { message = ex.Message });
+            }
         }
 
         private Guid GetUserId()

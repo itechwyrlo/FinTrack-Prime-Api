@@ -11,7 +11,7 @@ namespace FinTrackPrime.WebApi.Controllers
 {
     [ApiController]
     [Route("api/investment-tracker")]
-    [Authorize(Policy = "RequireInvestmentTracker")]
+    [Authorize(Policy = "RequirePremium")]
     public class InvestmentTrackerController : ControllerBase
     {
         private readonly IInvestmentTrackerService _investmentTrackerService;

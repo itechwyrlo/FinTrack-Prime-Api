@@ -2,6 +2,7 @@ using System.Text;
 using FinTrackPrime.Business.Interfaces;
 using FinTrackPrime.Business.Services;
 using FinTrackPrime.Models.Persistence;
+using FinTrackPrime.WebApi.Hubs;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.IdentityModel.Tokens;
@@ -23,6 +24,8 @@ if (!builder.Environment.IsDevelopment())
         ("Jwt:Key", builder.Configuration["Jwt:Key"] ?? ""),
         ("PayPal:ClientId", builder.Configuration["PayPal:ClientId"] ?? ""),
         ("PayPal:ClientSecret", builder.Configuration["PayPal:ClientSecret"] ?? ""),
+        ("Finverse:ClientId", builder.Configuration["Finverse:ClientId"] ?? ""),
+        ("Finverse:ClientSecret", builder.Configuration["Finverse:ClientSecret"] ?? ""),
     };
 
     var missing = required.Where(r => string.IsNullOrWhiteSpace(r.Value)).Select(r => r.Key).ToList();
@@ -54,16 +57,28 @@ builder.Services.AddScoped<IAccountService, AccountService>();
 builder.Services.AddScoped<IBudgetPlannerService, BudgetPlannerService>();
 builder.Services.AddScoped<ICashFlowService, CashFlowService>();
 builder.Services.AddScoped<IPremiumAccessService, PremiumAccessService>();
+builder.Services.AddScoped<IBankLinkService, BankLinkService>();
 builder.Services.AddScoped<ILoanCalculatorService, LoanCalculatorService>();
 builder.Services.AddScoped<IInvestmentTrackerService, InvestmentTrackerService>();
 builder.Services.AddScoped<IRetirementPlannerService, RetirementPlannerService>();
 builder.Services.AddScoped<IFinancialStatementService, FinancialStatementService>();
+builder.Services.AddScoped<INotificationService, NotificationService>();
 
 // Typed HttpClient: BaseAddress comes from config so switching between
 // PayPal's sandbox and live API is a config change, not a code change.
 builder.Services.AddHttpClient<IPayPalClient, PayPalClient>(client =>
 {
     client.BaseAddress = new Uri(builder.Configuration["PayPal:ApiBaseUrl"]!);
+});
+
+builder.Services.AddHttpClient<IFinverseClient, FinverseClient>(client =>
+{
+    client.BaseAddress = new Uri(builder.Configuration["Finverse:ApiBaseUrl"]!);
+});
+
+builder.Services.AddHttpClient<ICryptoPriceClient, CryptoPriceClient>(client =>
+{
+    client.BaseAddress = new Uri(builder.Configuration["CoinGecko:ApiBaseUrl"]!);
 });
 
 // ---------- Authentication ----------
@@ -88,22 +103,33 @@ builder.Services
             ValidAudience = jwtSection["Audience"],
             IssuerSigningKey = new SymmetricSecurityKey(Encoding.UTF8.GetBytes(jwtKey)),
         };
+        // A browser can't set an Authorization header on a WebSocket
+        // handshake, so the SignalR JS client sends the token as an
+        // access_token query param instead (accessTokenFactory) — this
+        // reads it back out only for hub requests. Every other
+        // endpoint's existing header-based Bearer flow is untouched.
+        options.Events = new JwtBearerEvents
+        {
+            OnMessageReceived = context =>
+            {
+                var accessToken = context.Request.Query["access_token"];
+                if (!string.IsNullOrEmpty(accessToken) && context.HttpContext.Request.Path.StartsWithSegments("/hubs"))
+                {
+                    context.Token = accessToken;
+                }
+                return Task.CompletedTask;
+            },
+        };
     });
 
 builder.Services.AddAuthorization(options =>
 {
-    // Backed by the per-tool claims baked in at issuance (see
-    // JwtTokenGenerator). Each of the four premium tool controllers
-    // uses its own policy, since owning one tool says nothing about
-    // owning the others.
-    options.AddPolicy("RequireLoanCalculator", policy =>
-        policy.RequireClaim("unlock:LoanCalculator", true.ToString()));
-    options.AddPolicy("RequireInvestmentTracker", policy =>
-        policy.RequireClaim("unlock:InvestmentTracker", true.ToString()));
-    options.AddPolicy("RequireRetirementPlanner", policy =>
-        policy.RequireClaim("unlock:RetirementPlanner", true.ToString()));
-    options.AddPolicy("RequireFinancialStatement", policy =>
-        policy.RequireClaim("unlock:FinancialStatement", true.ToString()));
+    // Backed by the "unlock:premium" claim baked in at issuance (see
+    // JwtTokenGenerator). All four premium tool controllers share this
+    // one policy, since premium is a single all-tools purchase now
+    // rather than something bought per tool.
+    options.AddPolicy("RequirePremium", policy =>
+        policy.RequireClaim("unlock:premium", true.ToString()));
 });
 
 // ---------- CORS ----------
@@ -128,12 +154,18 @@ builder.Services.AddCors(options =>
     });
 });
 
+// Encrypts LinkedInstitution.AccessToken at rest (see BankLinkService).
+builder.Services.AddDataProtection();
+
+builder.Services.AddSignalR();
+builder.Services.AddHostedService<FinTrackPrime.WebApi.BackgroundServices.SpendMonitorService>();
+
 builder.Services.AddControllers()
     .AddJsonOptions(options =>
     {
-        // Without this, enums like PremiumTool, BudgetCategoryType, and
+        // Without this, enums like BudgetCategoryType and
         // TransactionDirection serialize as plain numbers (0, 1), but
-        // the frontend sends and expects them as text ("LoanCalculator",
+        // the frontend sends and expects them as text ("Expense",
         // "Income"). This makes both sides agree.
         options.JsonSerializerOptions.Converters.Add(
             new System.Text.Json.Serialization.JsonStringEnumConverter());
@@ -158,5 +190,6 @@ app.UseCors("FrontendPolicy");
 app.UseAuthentication();
 app.UseAuthorization();
 app.MapControllers();
+app.MapHub<NotificationsHub>("/hubs/notifications");
 
 app.Run();

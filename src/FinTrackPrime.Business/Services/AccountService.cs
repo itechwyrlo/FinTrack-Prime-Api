@@ -1,5 +1,4 @@
 using System;
-using System.Collections.Generic;
 using System.Linq;
 using System.Threading.Tasks;
 using FinTrackPrime.Business.Interfaces;
@@ -36,6 +35,7 @@ namespace FinTrackPrime.Business.Services
                     Nickname = account.Nickname,
                     Type = account.Type,
                     Balance = account.Balance,
+                    Currency = account.Currency,
                     RecentTransactions = account.Transactions
                         .OrderByDescending(t => t.OccurredAtUtc)
                         .Take(25)
@@ -53,71 +53,6 @@ namespace FinTrackPrime.Business.Services
             }
 
             return dashboard;
-        }
-
-        public async Task<AccountViewModel> CreateAccountAsync(Guid userId, CreateAccountRequest request)
-        {
-            var account = new Account
-            {
-                Id = Guid.NewGuid(),
-                UserId = userId,
-                Nickname = request.Nickname.Trim(),
-                Type = request.Type,
-                Balance = request.StartingBalance,
-                CreatedAtUtc = DateTime.UtcNow,
-            };
-
-            _db.Accounts.Add(account);
-            await _db.SaveChangesAsync();
-
-            return new AccountViewModel
-            {
-                Id = account.Id,
-                Nickname = account.Nickname,
-                Type = account.Type,
-                Balance = account.Balance,
-                RecentTransactions = new List<TransactionViewModel>(),
-            };
-        }
-
-        public async Task<TransactionViewModel> AddTransactionAsync(
-            Guid userId, Guid accountId, CreateTransactionRequest request)
-        {
-            var account = await _db.Accounts
-                .FirstOrDefaultAsync(a => a.Id == accountId && a.UserId == userId);
-
-            if (account is null)
-            {
-                throw new InvalidOperationException("Account not found.");
-            }
-
-            var transaction = new Transaction
-            {
-                Id = Guid.NewGuid(),
-                AccountId = account.Id,
-                Description = request.Description.Trim(),
-                Category = request.Category.Trim(),
-                Amount = request.Amount,
-                Direction = request.Direction,
-                OccurredAtUtc = DateTime.UtcNow,
-            };
-
-            account.Balance += request.Direction == TransactionDirection.Income
-                ? request.Amount
-                : -request.Amount;
-
-            _db.Transactions.Add(transaction);
-            await _db.SaveChangesAsync();
-
-            return new TransactionViewModel
-            {
-                Id = transaction.Id,
-                Description = transaction.Description,
-                Category = transaction.Category,
-                Amount = transaction.Amount,
-                Direction = transaction.Direction,
-                OccurredAtUtc = transaction.OccurredAtUtc,
-            };
         }
     }
 }

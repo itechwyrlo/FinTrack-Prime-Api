@@ -1,5 +1,4 @@
 using System;
-using System.Collections.Generic;
 using FinTrackPrime.Models.Entities;
 
 namespace FinTrackPrime.Business.Interfaces
@@ -11,10 +10,11 @@ namespace FinTrackPrime.Business.Interfaces
 
     public interface IJwtTokenGenerator
     {
-        // Every claim in the token (including which tools are unlocked)
-        // reflects the User's state at the moment this is called. A new
-        // token has to be issued whenever that state changes, or the
-        // old token keeps asserting the old value until it expires.
-        GeneratedAccessToken GenerateToken(User user, IEnumerable<PremiumTool> unlockedTools);
+        // Every claim in the token (including whether premium is
+        // unlocked) reflects the User's state at the moment this is
+        // called. A new token has to be issued whenever that state
+        // changes, or the old token keeps asserting the old value until
+        // it expires.
+        GeneratedAccessToken GenerateToken(User user, bool premiumUnlocked);
     }
 }

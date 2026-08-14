@@ -19,15 +19,34 @@ namespace FinTrackPrime.Models.ViewModels
         public decimal Expenses { get; set; }
     }
 
-    // Everything the Cash Flow Dashboard screen needs in one call: totals
-    // across all of the user's accounts, an expense breakdown by
-    // category, and a month-by-month trend for the chart.
-    public class CashFlowViewModel
+    // Same shape as the top-level totals below, scoped to one currency.
+    // FinTrack does no FX conversion (see Account.Currency), so a user
+    // with accounts in more than one currency gets one of these per
+    // currency instead of a single number that silently adds e.g. SGD to
+    // HKD as if they were equal.
+    public class CashFlowByCurrencyViewModel
     {
+        public string Currency { get; set; } = string.Empty;
         public decimal TotalIncome { get; set; }
         public decimal TotalExpenses { get; set; }
         public decimal Net { get; set; }
         public List<CategoryAmountViewModel> ExpenseByCategory { get; set; } = new();
         public List<MonthlyCashFlowViewModel> MonthlyTrend { get; set; } = new();
+    }
+
+    // Everything the Cash Flow Dashboard screen needs in one call. The
+    // top-level totals cover the user's primary currency only (whichever
+    // currency has the most transactions) so existing single-currency
+    // callers keep working unchanged; any other currencies the user holds
+    // are broken out in OtherCurrencies instead of being blended in.
+    public class CashFlowViewModel
+    {
+        public string Currency { get; set; } = string.Empty;
+        public decimal TotalIncome { get; set; }
+        public decimal TotalExpenses { get; set; }
+        public decimal Net { get; set; }
+        public List<CategoryAmountViewModel> ExpenseByCategory { get; set; } = new();
+        public List<MonthlyCashFlowViewModel> MonthlyTrend { get; set; } = new();
+        public List<CashFlowByCurrencyViewModel> OtherCurrencies { get; set; } = new();
     }
 }

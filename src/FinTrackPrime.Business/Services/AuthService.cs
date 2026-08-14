@@ -1,5 +1,4 @@
 using System;
-using System.Collections.Generic;
 using System.Linq;
 using System.Security.Cryptography;
 using System.Text;
@@ -72,10 +71,10 @@ namespace FinTrackPrime.Business.Services
             // user actually creates them.
             await _budgetPlannerService.SeedDefaultCategoriesAsync(user.Id);
 
-            // A brand-new user owns no premium tools yet, and this is a
+            // A brand-new user hasn't unlocked premium yet, and this is a
             // fresh login session, so it starts its own refresh-token
             // family.
-            return await IssueTokensAsync(user, new List<PremiumTool>(), Guid.NewGuid());
+            return await IssueTokensAsync(user, premiumUnlocked: false, Guid.NewGuid());
         }
 
         public async Task<AuthResult> LoginAsync(LoginRequest request)
@@ -94,8 +93,8 @@ namespace FinTrackPrime.Business.Services
                 throw new InvalidOperationException("Invalid email or password.");
             }
 
-            var unlockedTools = await GetUnlockedToolsAsync(user.Id);
-            return await IssueTokensAsync(user, unlockedTools, Guid.NewGuid());
+            var premiumUnlocked = await IsPremiumUnlockedAsync(user.Id);
+            return await IssueTokensAsync(user, premiumUnlocked, Guid.NewGuid());
         }
 
         public async Task<AuthResult> LoginWithGoogleAsync(string googleIdToken)
@@ -158,8 +157,8 @@ namespace FinTrackPrime.Business.Services
                 await _budgetPlannerService.SeedDefaultCategoriesAsync(user.Id);
             }
 
-            var unlockedTools = await GetUnlockedToolsAsync(user.Id);
-            return await IssueTokensAsync(user, unlockedTools, Guid.NewGuid());
+            var premiumUnlocked = await IsPremiumUnlockedAsync(user.Id);
+            return await IssueTokensAsync(user, premiumUnlocked, Guid.NewGuid());
         }
 
         public async Task<AuthResult> RefreshAsync(string refreshToken)
@@ -202,11 +201,11 @@ namespace FinTrackPrime.Business.Services
             existing.RevokedAtUtc = DateTime.UtcNow;
 
             var user = existing.User!;
-            var unlockedTools = await GetUnlockedToolsAsync(user.Id);
+            var premiumUnlocked = await IsPremiumUnlockedAsync(user.Id);
 
             // Same FamilyId: this is a rotation within the same session,
             // not a new login.
-            return await IssueTokensAsync(user, unlockedTools, existing.FamilyId);
+            return await IssueTokensAsync(user, premiumUnlocked, existing.FamilyId);
         }
 
         public async Task LogoutAsync(string refreshToken)
@@ -222,9 +221,9 @@ namespace FinTrackPrime.Business.Services
             }
         }
 
-        private async Task<AuthResult> IssueTokensAsync(User user, List<PremiumTool> unlockedTools, Guid familyId)
+        private async Task<AuthResult> IssueTokensAsync(User user, bool premiumUnlocked, Guid familyId)
         {
-            var generatedAccessToken = _jwtTokenGenerator.GenerateToken(user, unlockedTools);
+            var generatedAccessToken = _jwtTokenGenerator.GenerateToken(user, premiumUnlocked);
 
             var rawRefreshToken = GenerateRawRefreshToken();
             var refreshTokenExpiryDays = _config.GetSection("RefreshToken").GetValue<int?>("ExpiryDays")
@@ -254,19 +253,16 @@ namespace FinTrackPrime.Business.Services
                     AccessTokenExpiresAtUtc = generatedAccessToken.ExpiresAtUtc,
                     FullName = user.FullName,
                     Email = user.Email,
-                    UnlockedTools = unlockedTools,
+                    PremiumUnlocked = premiumUnlocked,
                 },
                 RefreshToken = rawRefreshToken,
                 RefreshTokenExpiresAtUtc = refreshTokenExpiresAtUtc,
             };
         }
 
-        private async Task<List<PremiumTool>> GetUnlockedToolsAsync(Guid userId)
+        private async Task<bool> IsPremiumUnlockedAsync(Guid userId)
         {
-            return await _db.PremiumPurchases
-                .Where(p => p.UserId == userId)
-                .Select(p => p.Tool)
-                .ToListAsync();
+            return await _db.PremiumPurchases.AnyAsync(p => p.UserId == userId);
         }
 
         private static string GenerateRawRefreshToken()

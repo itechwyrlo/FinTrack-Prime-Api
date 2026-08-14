@@ -11,7 +11,7 @@ namespace FinTrackPrime.WebApi.Controllers
 {
     [ApiController]
     [Route("api/retirement-planner")]
-    [Authorize(Policy = "RequireRetirementPlanner")]
+    [Authorize(Policy = "RequirePremium")]
     public class RetirementPlannerController : ControllerBase
     {
         private readonly IRetirementPlannerService _retirementPlannerService;

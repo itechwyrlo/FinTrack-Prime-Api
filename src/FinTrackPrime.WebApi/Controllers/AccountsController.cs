@@ -24,28 +24,6 @@ namespace FinTrackPrime.WebApi.Controllers
             _accountService = accountService;
         }
 
-        [HttpPost]
-        public async Task<ActionResult<AccountViewModel>> CreateAccount(CreateAccountRequest request)
-        {
-            var account = await _accountService.CreateAccountAsync(GetUserId(), request);
-            return Ok(account);
-        }
-
-        [HttpPost("{accountId:guid}/transactions")]
-        public async Task<ActionResult<TransactionViewModel>> AddTransaction(
-            Guid accountId, CreateTransactionRequest request)
-        {
-            try
-            {
-                var transaction = await _accountService.AddTransactionAsync(GetUserId(), accountId, request);
-                return Ok(transaction);
-            }
-            catch (InvalidOperationException ex)
-            {
-                return NotFound(new { message = ex.Message });
-            }
-        }
-
         private Guid GetUserId()
         {
             var subClaim = User.FindFirst(JwtRegisteredClaimNames.Sub)?.Value

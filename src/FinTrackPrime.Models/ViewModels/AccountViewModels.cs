@@ -21,6 +21,13 @@ namespace FinTrackPrime.Models.ViewModels
         public string Nickname { get; set; } = string.Empty;
         public AccountType Type { get; set; }
         public decimal Balance { get; set; }
+
+        // Was missing entirely — the frontend had no way to know Balance
+        // wasn't always in the same unit (HKD vs SGD vs, for an
+        // Unsupported account, BTC/USD) and formatted every account as if
+        // it were one fixed currency. See Account.Currency.
+        public string Currency { get; set; } = string.Empty;
+
         public List<TransactionViewModel> RecentTransactions { get; set; } = new();
     }
 
@@ -31,30 +38,14 @@ namespace FinTrackPrime.Models.ViewModels
         public List<AccountViewModel> Accounts { get; set; } = new();
     }
 
-    public class CreateAccountRequest
+    public class StartLinkResponse
     {
-        [Required, MaxLength(80)]
-        public string Nickname { get; set; } = string.Empty;
-
-        [Required]
-        public AccountType Type { get; set; }
-
-        [Range(0, double.MaxValue)]
-        public decimal StartingBalance { get; set; }
+        public string LinkUrl { get; set; } = string.Empty;
     }
 
-    public class CreateTransactionRequest
+    public class CompleteLinkRequest
     {
-        [Required, MaxLength(120)]
-        public string Description { get; set; } = string.Empty;
-
-        [Required, MaxLength(80)]
-        public string Category { get; set; } = string.Empty;
-
-        [Range(0.01, double.MaxValue)]
-        public decimal Amount { get; set; }
-
         [Required]
-        public TransactionDirection Direction { get; set; }
+        public string LinkCode { get; set; } = string.Empty;
     }
 }

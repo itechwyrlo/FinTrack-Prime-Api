@@ -11,9 +11,9 @@ namespace FinTrackPrime.Models.Entities
     // signed in with Google at least once. A user can have both set: a
     // password account that later links Google via a matching email.
     //
-    // Premium access is no longer a single flag here: which tools a
-    // user has unlocked is tracked per-purchase in PremiumPurchase
-    // instead, since tools are unlocked independently of each other.
+    // Whether this user has premium access lives in PremiumPurchase, not
+    // as a flag here: at most one row per user, added the moment they
+    // complete the one-time purchase that unlocks every premium tool.
     public class User
     {
         public Guid Id { get; set; }
@@ -26,5 +26,6 @@ namespace FinTrackPrime.Models.Entities
 
         public ICollection<Account> Accounts { get; set; } = new List<Account>();
         public ICollection<RefreshToken> RefreshTokens { get; set; } = new List<RefreshToken>();
+        public ICollection<LinkedInstitution> LinkedInstitutions { get; set; } = new List<LinkedInstitution>();
     }
 }

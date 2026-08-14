@@ -34,9 +34,34 @@ namespace FinTrackPrime.Models.Migrations
                     b.Property<DateTime>("CreatedAtUtc")
                         .HasColumnType("datetime2");
 
+                    b.Property<string>("Currency")
+                        .IsRequired()
+                        .HasMaxLength(8)
+                        .HasColumnType("nvarchar(8)");
+
+                    b.Property<string>("ExternalAccountId")
+                        .IsRequired()
+                        .HasMaxLength(128)
+                        .HasColumnType("nvarchar(128)");
+
+                    b.Property<string>("FiatEquivalentCurrency")
+                        .HasMaxLength(8)
+                        .HasColumnType("nvarchar(8)");
+
+                    b.Property<decimal?>("FiatEquivalentValue")
+                        .HasColumnType("decimal(18,2)");
+
+                    b.Property<string>("Institution")
+                        .IsRequired()
+                        .HasMaxLength(80)
+                        .HasColumnType("nvarchar(80)");
+
                     b.Property<string>("Nickname")
                         .IsRequired()
                         .HasColumnType("nvarchar(max)");
+
+                    b.Property<DateTime?>("PriceFetchedAtUtc")
+                        .HasColumnType("datetime2");
 
                     b.Property<int>("Type")
                         .HasColumnType("int");
@@ -49,6 +74,33 @@ namespace FinTrackPrime.Models.Migrations
                     b.HasIndex("UserId");
 
                     b.ToTable("Accounts");
+                });
+
+            modelBuilder.Entity("FinTrackPrime.Models.Entities.Asset", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<decimal>("Amount")
+                        .HasColumnType("decimal(18,2)");
+
+                    b.Property<string>("Name")
+                        .IsRequired()
+                        .HasMaxLength(120)
+                        .HasColumnType("nvarchar(120)");
+
+                    b.Property<int>("Type")
+                        .HasColumnType("int");
+
+                    b.Property<Guid>("UserId")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("UserId");
+
+                    b.ToTable("Assets");
                 });
 
             modelBuilder.Entity("FinTrackPrime.Models.Entities.BudgetCategory", b =>
@@ -127,6 +179,9 @@ namespace FinTrackPrime.Models.Migrations
                         .HasMaxLength(120)
                         .HasColumnType("nvarchar(120)");
 
+                    b.Property<int>("Type")
+                        .HasColumnType("int");
+
                     b.Property<Guid>("UserId")
                         .HasColumnType("uniqueidentifier");
 
@@ -135,6 +190,140 @@ namespace FinTrackPrime.Models.Migrations
                     b.HasIndex("UserId");
 
                     b.ToTable("Liabilities");
+                });
+
+            modelBuilder.Entity("FinTrackPrime.Models.Entities.LinkedInstitution", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<string>("AccessToken")
+                        .IsRequired()
+                        .HasMaxLength(2048)
+                        .HasColumnType("nvarchar(2048)");
+
+                    b.Property<string>("Institution")
+                        .IsRequired()
+                        .HasMaxLength(80)
+                        .HasColumnType("nvarchar(80)");
+
+                    b.Property<DateTime?>("LastSyncedAtUtc")
+                        .HasColumnType("datetime2");
+
+                    b.Property<DateTime>("LinkedAtUtc")
+                        .HasColumnType("datetime2");
+
+                    b.Property<Guid>("UserId")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("UserId");
+
+                    b.ToTable("LinkedInstitutions");
+                });
+
+            modelBuilder.Entity("FinTrackPrime.Models.Entities.LoanRate", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<decimal>("AnnualRatePercent")
+                        .HasColumnType("decimal(5,2)");
+
+                    b.Property<int>("Type")
+                        .HasColumnType("int");
+
+                    b.Property<DateTime>("UpdatedAtUtc")
+                        .HasColumnType("datetime2");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("Type")
+                        .IsUnique();
+
+                    b.ToTable("LoanRates");
+
+                    b.HasData(
+                        new
+                        {
+                            Id = new Guid("8f14e45f-ceea-4b90-8f0a-000000000001"),
+                            AnnualRatePercent = 6.50m,
+                            Type = 1,
+                            UpdatedAtUtc = new DateTime(2026, 8, 10, 0, 0, 0, 0, DateTimeKind.Utc)
+                        },
+                        new
+                        {
+                            Id = new Guid("8f14e45f-ceea-4b90-8f0a-000000000002"),
+                            AnnualRatePercent = 7.25m,
+                            Type = 2,
+                            UpdatedAtUtc = new DateTime(2026, 8, 10, 0, 0, 0, 0, DateTimeKind.Utc)
+                        },
+                        new
+                        {
+                            Id = new Guid("8f14e45f-ceea-4b90-8f0a-000000000003"),
+                            AnnualRatePercent = 5.50m,
+                            Type = 3,
+                            UpdatedAtUtc = new DateTime(2026, 8, 10, 0, 0, 0, 0, DateTimeKind.Utc)
+                        },
+                        new
+                        {
+                            Id = new Guid("8f14e45f-ceea-4b90-8f0a-000000000004"),
+                            AnnualRatePercent = 11.00m,
+                            Type = 4,
+                            UpdatedAtUtc = new DateTime(2026, 8, 10, 0, 0, 0, 0, DateTimeKind.Utc)
+                        },
+                        new
+                        {
+                            Id = new Guid("8f14e45f-ceea-4b90-8f0a-000000000005"),
+                            AnnualRatePercent = 9.00m,
+                            Type = 5,
+                            UpdatedAtUtc = new DateTime(2026, 8, 10, 0, 0, 0, 0, DateTimeKind.Utc)
+                        });
+                });
+
+            modelBuilder.Entity("FinTrackPrime.Models.Entities.Notification", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<DateTime>("CreatedAtUtc")
+                        .HasColumnType("datetime2");
+
+                    b.Property<bool>("IsRead")
+                        .HasColumnType("bit");
+
+                    b.Property<string>("Message")
+                        .IsRequired()
+                        .HasMaxLength(1000)
+                        .HasColumnType("nvarchar(1000)");
+
+                    b.Property<Guid?>("RelatedTransactionId")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<string>("Title")
+                        .IsRequired()
+                        .HasMaxLength(200)
+                        .HasColumnType("nvarchar(200)");
+
+                    b.Property<int>("Type")
+                        .HasColumnType("int");
+
+                    b.Property<Guid>("UserId")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("RelatedTransactionId")
+                        .IsUnique()
+                        .HasFilter("[RelatedTransactionId] IS NOT NULL");
+
+                    b.HasIndex("UserId", "CreatedAtUtc");
+
+                    b.ToTable("Notifications");
                 });
 
             modelBuilder.Entity("FinTrackPrime.Models.Entities.PremiumPurchase", b =>
@@ -159,9 +348,6 @@ namespace FinTrackPrime.Models.Migrations
                     b.Property<DateTime>("PurchasedAtUtc")
                         .HasColumnType("datetime2");
 
-                    b.Property<int>("Tool")
-                        .HasColumnType("int");
-
                     b.Property<Guid>("UserId")
                         .HasColumnType("uniqueidentifier");
 
@@ -170,7 +356,8 @@ namespace FinTrackPrime.Models.Migrations
                     b.HasIndex("PayPalOrderId")
                         .IsUnique();
 
-                    b.HasIndex("UserId");
+                    b.HasIndex("UserId")
+                        .IsUnique();
 
                     b.ToTable("PremiumPurchases");
                 });
@@ -269,12 +456,17 @@ namespace FinTrackPrime.Models.Migrations
                     b.Property<int>("Direction")
                         .HasColumnType("int");
 
+                    b.Property<string>("ExternalTransactionId")
+                        .IsRequired()
+                        .HasMaxLength(128)
+                        .HasColumnType("nvarchar(128)");
+
                     b.Property<DateTime>("OccurredAtUtc")
                         .HasColumnType("datetime2");
 
                     b.HasKey("Id");
 
-                    b.HasIndex("AccountId");
+                    b.HasIndex("AccountId", "ExternalTransactionId");
 
                     b.ToTable("Transactions");
                 });
@@ -333,6 +525,17 @@ namespace FinTrackPrime.Models.Migrations
                     b.Navigation("User");
                 });
 
+            modelBuilder.Entity("FinTrackPrime.Models.Entities.Asset", b =>
+                {
+                    b.HasOne("FinTrackPrime.Models.Entities.User", "User")
+                        .WithMany()
+                        .HasForeignKey("UserId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.Navigation("User");
+                });
+
             modelBuilder.Entity("FinTrackPrime.Models.Entities.BudgetCategory", b =>
                 {
                     b.HasOne("FinTrackPrime.Models.Entities.User", "User")
@@ -356,6 +559,28 @@ namespace FinTrackPrime.Models.Migrations
                 });
 
             modelBuilder.Entity("FinTrackPrime.Models.Entities.Liability", b =>
+                {
+                    b.HasOne("FinTrackPrime.Models.Entities.User", "User")
+                        .WithMany()
+                        .HasForeignKey("UserId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.Navigation("User");
+                });
+
+            modelBuilder.Entity("FinTrackPrime.Models.Entities.LinkedInstitution", b =>
+                {
+                    b.HasOne("FinTrackPrime.Models.Entities.User", "User")
+                        .WithMany("LinkedInstitutions")
+                        .HasForeignKey("UserId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.Navigation("User");
+                });
+
+            modelBuilder.Entity("FinTrackPrime.Models.Entities.Notification", b =>
                 {
                     b.HasOne("FinTrackPrime.Models.Entities.User", "User")
                         .WithMany()
@@ -418,6 +643,8 @@ namespace FinTrackPrime.Models.Migrations
             modelBuilder.Entity("FinTrackPrime.Models.Entities.User", b =>
                 {
                     b.Navigation("Accounts");
+
+                    b.Navigation("LinkedInstitutions");
 
                     b.Navigation("RefreshTokens");
                 });
